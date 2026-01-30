@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp CRM</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #111b21;
+      background: #f0f2f5;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+      color: white;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-icon {
+      width: 40px;
+      height: 40px;
+      background: white;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #128C7E;
+      font-size: 14px;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .header-subtitle {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      padding: 16px;
+      background: white;
+    }
+
+    .stat-card {
+      text-align: center;
+      padding: 12px 8px;
+      background: #f0f2f5;
+      border-radius: 10px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+      color: #128C7E;
+    }
+
+    .stat-value.danger {
+      color: #DC3545;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: #667781;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+    }
+
+    /* Section */
+    .section {
+      padding: 16px;
+      background: white;
+      margin-top: 8px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #667781;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    /* Follow-up List */
+    .followup-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .followup-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      background: #f0f2f5;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+
+    .followup-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .followup-item.due {
+      background: #ffebee;
+      border-left: 3px solid #DC3545;
+    }
+
+    .followup-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #25D366;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 14px;
+    }
+
+    .followup-icon.due {
+      background: #DC3545;
+    }
+
+    .followup-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .followup-name {
+      font-weight: 600;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .followup-time {
+      font-size: 12px;
+      color: #667781;
+      margin-top: 2px;
+    }
+
+    .followup-note {
+      font-size: 11px;
+      color: #667781;
+      margin-top: 4px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Empty State */
+    .empty {
+      text-align: center;
+      padding: 24px;
+      color: #667781;
+    }
+
+    .empty-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    /* Actions */
+    .actions {
+      padding: 16px;
+      background: white;
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #25D366;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #128C7E;
+    }
+
+    .btn-secondary {
+      background: #f0f2f5;
+      color: #111b21;
+    }
+
+    .btn-secondary:hover {
+      background: #e9edef;
+    }
+
+    /* Status Indicator */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: #f0f2f5;
+      font-size: 12px;
+      color: #667781;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #DC3545;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .status-dot.connected {
+      background: #25D366;
+    }
+
+    /* PC Info */
+    .pc-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pc-badge {
+      padding: 2px 8px;
+      background: #e3f2fd;
+      color: #1976d2;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .pc-badge.admin {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    /* Scrollbar */
+    .followup-list::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .followup-list::-webkit-scrollbar-track {
+      background: #f0f2f5;
+    }
+
+    .followup-list::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">CRM</div>
+    <div>
+      <div class="header-title">WhatsApp CRM</div>
+      <div class="header-subtitle">Follow-up Manager</div>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value danger" id="stat-due">0</div>
+      <div class="stat-label">Due Now</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-pending">0</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-leads">0</div>
+      <div class="stat-label">Total Leads</div>
+    </div>
+  </div>
+
+  <!-- Due Follow-ups Section -->
+  <div class="section">
+    <div class="section-title">Upcoming Follow-ups</div>
+    <div class="followup-list" id="followup-list">
+      <div class="empty">
+        <div class="empty-icon">📋</div>
+        <div>No pending follow-ups</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn btn-primary" id="open-whatsapp-btn">
+      <span>💬</span>
+      <span>Open WhatsApp Web</span>
+    </button>
+    <button class="btn btn-secondary" id="sync-btn">
+      <span>🔄</span>
+      <span>Sync to Google Sheets</span>
+    </button>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="pc-info" id="pc-info">
+      <span class="status-dot" id="sync-status-dot"></span>
+      <span id="sync-status-text">Loading...</span>
+    </div>
+    <div id="pc-name-display">
+      <span class="pc-badge" id="pc-badge">Staff</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#25D366"/>
+      <stop offset="100%" style="stop-color:#128C7E"/>
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bg)"/>
+  <!-- WhatsApp phone icon simplified -->
+  <path d="M64 24c-22.1 0-40 17.9-40 40 0 7.1 1.9 13.7 5.1 19.4L24 104l21.2-5.6c5.5 3 11.8 4.6 18.8 4.6 22.1 0 40-17.9 40-40s-17.9-40-40-40zm0 72c-6.2 0-12-1.6-17-4.5l-1.2-.7-12.5 3.3 3.3-12.1-.8-1.3c-3.1-5-4.8-10.9-4.8-17.7 0-17.6 14.4-32 32-32s32 14.4 32 32-14.4 32-32 32z" fill="white"/>
+  <!-- CRM badge -->
+  <circle cx="98" cy="30" r="24" fill="#FF6B35"/>
+  <text x="98" y="36" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">CRM</text>
+</svg>
