@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "WhatsApp CRM - Follow-Up Manager",
+  "version": "1.0.0",
+  "description": "A lightweight WhatsApp CRM that ensures no follow-up is ever missed, works across multiple PCs, and syncs with Google Sheets.",
+  "permissions": [
+    "storage",
+    "notifications",
+    "alarms",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://sheets.googleapis.com/*",
+    "https://www.googleapis.com/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["lib/utils.js", "lib/storage.js", "content/lead-detector.js", "content/crm-ui.js"],
+      "css": ["styles/crm-panel.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    },
+    "default_title": "WhatsApp CRM"
+  },
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
+  "oauth2": {
+    "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/spreadsheets"
+    ]
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "styles/*"],
+      "matches": ["https://web.whatsapp.com/*"]
+    }
+  ]
+}
