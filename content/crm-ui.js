@@ -1,14 +1,15 @@
 /**
- * WhatsApp CRM - Main UI Component
- * Injects the CRM panel into WhatsApp Web
+ * WhatsApp CRM - Main UI Component (Floating Popup Version)
+ * Injects the CRM panel into WhatsApp Web as a floating popup
  */
 
 const CRMUI = {
   // State
-  isExpanded: false,
+  isOpen: false,
   currentTab: 'lead',
   currentLead: null,
   elements: {},
+  showFollowUpForm: false,
 
   /**
    * Initialize the CRM UI
@@ -19,12 +20,6 @@ const CRMUI = {
     // Initialize storage
     await CRMStorage.init();
 
-    // Check if PC setup is complete
-    const pcConfig = await CRMStorage.getPCConfig();
-    if (!pcConfig.setupComplete) {
-      // Will prompt for setup on first expand
-    }
-
     // Create and inject the CRM container
     this.createCRMContainer();
 
@@ -33,9 +28,6 @@ const CRMUI = {
 
     // Update stats
     await this.updateStats();
-
-    // Add body class for CSS adjustments
-    document.body.classList.add('crm-active');
 
     // Start checking for due follow-ups
     this.startFollowUpChecker();
@@ -50,127 +42,127 @@ const CRMUI = {
     // Check if already exists
     if (document.getElementById('whatsapp-crm-container')) return;
 
-    const container = CRMUtils.createElement('div', { id: 'whatsapp-crm-container' });
+    const container = document.createElement('div');
+    container.id = 'whatsapp-crm-container';
+    container.innerHTML = this.getContainerHTML();
 
-    // Create top bar
-    container.innerHTML = this.getTopBarHTML();
-
-    // Create expanded panel
-    const panel = CRMUtils.createElement('div', { id: 'crm-panel' });
-    panel.innerHTML = this.getPanelHTML();
-    container.appendChild(panel);
-
-    // Insert at the very top of body
-    document.body.insertBefore(container, document.body.firstChild);
+    document.body.appendChild(container);
 
     // Cache element references
     this.cacheElements();
   },
 
   /**
-   * Get top bar HTML
+   * Get container HTML with floating button and popup panel
    */
-  getTopBarHTML() {
+  getContainerHTML() {
     return `
-      <div id="crm-topbar">
-        <div class="crm-brand" id="crm-toggle-panel">
-          <div class="crm-brand-icon">CRM</div>
-          <span class="crm-brand-title">WhatsApp CRM</span>
-        </div>
+      <!-- Floating Action Button -->
+      <button id="crm-floating-btn" title="Open CRM">
+        <div class="crm-fab-icon">CRM</div>
+        <span class="crm-fab-badge hidden" id="crm-fab-badge">0</span>
+      </button>
 
-        <div class="crm-quick-stats" id="crm-quick-stats">
-          <div class="crm-stat" id="crm-stat-due" title="Due Follow-ups">
-            <span>🔔</span>
-            <span>Due</span>
-            <span class="crm-stat-badge danger" id="crm-badge-due">0</span>
+      <!-- Popup Panel -->
+      <div id="crm-popup-panel">
+        <!-- Header -->
+        <div id="crm-popup-header">
+          <div class="crm-popup-brand">
+            <div class="crm-popup-brand-icon">CRM</div>
+            <span class="crm-popup-brand-title">WhatsApp CRM</span>
           </div>
-          <div class="crm-stat" id="crm-stat-pending" title="Pending Follow-ups">
-            <span>📋</span>
-            <span>Pending</span>
-            <span class="crm-stat-badge" id="crm-badge-pending">0</span>
-          </div>
-          <div class="crm-stat" id="crm-stat-leads" title="Total Leads">
-            <span>👥</span>
-            <span>Leads</span>
-            <span class="crm-stat-badge" id="crm-badge-leads">0</span>
+          <div class="crm-popup-header-actions">
+            <button class="crm-popup-header-btn" id="crm-refresh-btn" title="Refresh">🔄</button>
+            <button class="crm-popup-header-btn" id="crm-close-btn" title="Close">✕</button>
           </div>
         </div>
 
-        <div class="crm-actions">
-          <button class="crm-btn crm-btn-primary" id="crm-add-followup-btn" title="Add Follow-up" disabled>
-            <span>➕</span>
-            <span>Follow-up</span>
-          </button>
-          <button class="crm-btn crm-btn-icon" id="crm-settings-btn" title="Settings">
-            ⚙️
-          </button>
-          <button class="crm-btn crm-btn-icon" id="crm-expand-btn" title="Expand/Collapse">
-            ▼
-          </button>
-        </div>
-      </div>
-    `;
-  },
-
-  /**
-   * Get expanded panel HTML
-   */
-  getPanelHTML() {
-    return `
-      <div class="crm-tabs">
-        <button class="crm-tab active" data-tab="lead">Current Lead</button>
-        <button class="crm-tab" data-tab="followups">Follow-ups</button>
-        <button class="crm-tab" data-tab="history">History</button>
-        <button class="crm-tab" data-tab="settings">Settings</button>
-      </div>
-
-      <!-- Lead Tab -->
-      <div class="crm-tab-content active" id="crm-tab-lead">
-        <div id="crm-lead-container">
-          <div class="crm-empty">
-            <div class="crm-empty-icon">💬</div>
-            <div class="crm-empty-text">Open a WhatsApp chat to see lead info</div>
+        <!-- Quick Stats -->
+        <div id="crm-quick-stats">
+          <div class="crm-stat-item" id="crm-stat-due" title="Due Follow-ups">
+            <div class="crm-stat-value danger" id="crm-badge-due">0</div>
+            <div class="crm-stat-label">Due</div>
+          </div>
+          <div class="crm-stat-item" id="crm-stat-pending" title="Pending Follow-ups">
+            <div class="crm-stat-value" id="crm-badge-pending">0</div>
+            <div class="crm-stat-label">Pending</div>
+          </div>
+          <div class="crm-stat-item" id="crm-stat-leads" title="Total Leads">
+            <div class="crm-stat-value" id="crm-badge-leads">0</div>
+            <div class="crm-stat-label">Leads</div>
           </div>
         </div>
-      </div>
 
-      <!-- Follow-ups Tab -->
-      <div class="crm-tab-content" id="crm-tab-followups">
-        <div id="crm-followups-container">
-          <div class="crm-empty">
-            <div class="crm-empty-icon">📋</div>
-            <div class="crm-empty-text">No pending follow-ups</div>
+        <!-- Tabs -->
+        <div class="crm-tabs">
+          <button class="crm-tab active" data-tab="lead">Lead</button>
+          <button class="crm-tab" data-tab="followups">Follow-ups</button>
+          <button class="crm-tab" data-tab="history">History</button>
+          <button class="crm-tab" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="crm-tab-content active" id="crm-tab-lead">
+          <div id="crm-lead-container">
+            <div class="crm-empty">
+              <div class="crm-empty-icon">💬</div>
+              <div class="crm-empty-text">Open a WhatsApp chat to see lead info</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- History Tab -->
-      <div class="crm-tab-content" id="crm-tab-history">
-        <div id="crm-history-container">
-          <div class="crm-empty">
-            <div class="crm-empty-icon">📜</div>
-            <div class="crm-empty-text">No history yet</div>
+        <div class="crm-tab-content" id="crm-tab-followups">
+          <div id="crm-followups-container">
+            <div class="crm-empty">
+              <div class="crm-empty-icon">📋</div>
+              <div class="crm-empty-text">No pending follow-ups</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="crm-tab-content" id="crm-tab-history">
+          <div id="crm-history-container">
+            <div class="crm-empty">
+              <div class="crm-empty-icon">📜</div>
+              <div class="crm-empty-text">No history yet</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="crm-tab-content" id="crm-tab-settings">
+          <div id="crm-settings-container">
+            ${this.getSettingsHTML()}
           </div>
         </div>
       </div>
 
-      <!-- Settings Tab -->
-      <div class="crm-tab-content" id="crm-tab-settings">
-        <div id="crm-settings-container">
-          ${this.getSettingsHTML()}
-        </div>
-      </div>
-
-      <!-- Add Follow-up Modal -->
+      <!-- Follow-up Modal -->
       <div class="crm-modal-overlay" id="crm-followup-modal">
         <div class="crm-modal">
           <div class="crm-modal-header">
             <h3 class="crm-modal-title">Add Follow-up</h3>
             <button class="crm-modal-close" id="crm-modal-close">✕</button>
           </div>
-          <div id="crm-followup-form-container">
-            ${this.getFollowUpFormHTML()}
-          </div>
+          <form id="crm-followup-form">
+            <div class="crm-form-row">
+              <div class="crm-form-group">
+                <label class="crm-form-label">Date</label>
+                <input type="date" class="crm-form-input" id="followup-date" required>
+              </div>
+              <div class="crm-form-group">
+                <label class="crm-form-label">Time</label>
+                <input type="time" class="crm-form-input" id="followup-time" required>
+              </div>
+            </div>
+            <div class="crm-form-group">
+              <label class="crm-form-label">Note (optional)</label>
+              <textarea class="crm-form-input crm-form-textarea" id="followup-note" placeholder="Reason for follow-up, context, etc."></textarea>
+            </div>
+            <div class="crm-form-actions">
+              <button type="button" class="crm-btn" id="followup-cancel-btn">Cancel</button>
+              <button type="submit" class="crm-btn crm-btn-primary">Save Follow-up</button>
+            </div>
+          </form>
         </div>
       </div>
     `;
@@ -182,18 +174,18 @@ const CRMUI = {
   getSettingsHTML() {
     return `
       <div class="crm-settings-section">
-        <h4 class="crm-settings-title">PC Configuration</h4>
+        <div class="crm-settings-title">PC Configuration</div>
         <div class="crm-settings-item">
-          <div>
+          <div class="crm-settings-info">
             <div class="crm-settings-label">PC Name</div>
-            <div class="crm-settings-desc">Identify this computer in activity logs</div>
+            <div class="crm-settings-desc">Identify this computer</div>
           </div>
-          <input type="text" class="crm-form-input" id="setting-pc-name" placeholder="e.g., Office-PC-1" style="width: 200px;">
+          <input type="text" class="crm-form-input" id="setting-pc-name" placeholder="e.g., Office-PC-1" style="width: 140px;">
         </div>
         <div class="crm-settings-item">
-          <div>
+          <div class="crm-settings-info">
             <div class="crm-settings-label">Role</div>
-            <div class="crm-settings-desc">Admin can view all data, Staff has limited access</div>
+            <div class="crm-settings-desc">Admin or Staff</div>
           </div>
           <select class="crm-select" id="setting-role">
             <option value="staff">Staff</option>
@@ -201,20 +193,19 @@ const CRMUI = {
           </select>
         </div>
         <div class="crm-settings-item">
-          <div>
+          <div class="crm-settings-info">
             <div class="crm-settings-label">WhatsApp Number</div>
-            <div class="crm-settings-desc">The WhatsApp number used on this PC</div>
           </div>
-          <input type="text" class="crm-form-input" id="setting-wa-number" placeholder="e.g., +91 98765 43210" style="width: 200px;">
+          <input type="text" class="crm-form-input" id="setting-wa-number" placeholder="+91 98765 43210" style="width: 140px;">
         </div>
       </div>
 
       <div class="crm-settings-section">
-        <h4 class="crm-settings-title">Notifications</h4>
+        <div class="crm-settings-title">Notifications</div>
         <div class="crm-settings-item">
-          <div>
+          <div class="crm-settings-info">
             <div class="crm-settings-label">Follow-up Reminders</div>
-            <div class="crm-settings-desc">Get notified when follow-ups are due</div>
+            <div class="crm-settings-desc">Get notified when due</div>
           </div>
           <label class="crm-toggle">
             <input type="checkbox" id="setting-notifications" checked>
@@ -224,70 +215,28 @@ const CRMUI = {
       </div>
 
       <div class="crm-settings-section">
-        <h4 class="crm-settings-title">Google Sheets Sync</h4>
-        <div class="crm-sheets-status" id="sheets-status">
+        <div class="crm-settings-title">Google Sheets</div>
+        <div class="crm-sheets-status">
           <span class="crm-sheets-status-dot" id="sheets-status-dot"></span>
           <span class="crm-sheets-status-text" id="sheets-status-text">Not connected</span>
-          <button class="crm-btn" id="sheets-connect-btn">Connect</button>
+          <button class="crm-btn crm-btn-sm" id="sheets-connect-btn">Connect</button>
         </div>
-        <div class="crm-settings-item" style="margin-top: 12px;">
-          <div>
+        <div class="crm-settings-item">
+          <div class="crm-settings-info">
             <div class="crm-settings-label">Sheet ID</div>
-            <div class="crm-settings-desc">Enter your Google Sheet ID for syncing</div>
           </div>
-          <input type="text" class="crm-form-input" id="setting-sheet-id" placeholder="Sheet ID from URL" style="width: 250px;">
+          <input type="text" class="crm-form-input" id="setting-sheet-id" placeholder="From URL" style="width: 140px;">
         </div>
       </div>
 
       <div class="crm-settings-section">
-        <h4 class="crm-settings-title">Data Management</h4>
-        <div class="crm-settings-item">
-          <div>
-            <div class="crm-settings-label">Export Data</div>
-            <div class="crm-settings-desc">Download all CRM data as JSON</div>
-          </div>
-          <button class="crm-btn" id="export-data-btn">Export</button>
+        <div class="crm-settings-title">Data</div>
+        <div style="display: flex; gap: 8px;">
+          <button class="crm-btn crm-btn-sm" id="export-data-btn" style="flex: 1;">📤 Export</button>
+          <button class="crm-btn crm-btn-sm" id="import-data-btn" style="flex: 1;">📥 Import</button>
         </div>
-        <div class="crm-settings-item">
-          <div>
-            <div class="crm-settings-label">Import Data</div>
-            <div class="crm-settings-desc">Import CRM data from JSON file</div>
-          </div>
-          <button class="crm-btn" id="import-data-btn">Import</button>
-          <input type="file" id="import-file-input" accept=".json" style="display: none;">
-        </div>
+        <input type="file" id="import-file-input" accept=".json" style="display: none;">
       </div>
-    `;
-  },
-
-  /**
-   * Get follow-up form HTML
-   */
-  getFollowUpFormHTML() {
-    const today = CRMUtils.getTodayDate();
-    const currentTime = CRMUtils.getCurrentTime();
-
-    return `
-      <form id="crm-followup-form">
-        <div class="crm-form-row">
-          <div class="crm-form-group">
-            <label class="crm-form-label">Date</label>
-            <input type="date" class="crm-form-input" id="followup-date" value="${today}" required>
-          </div>
-          <div class="crm-form-group">
-            <label class="crm-form-label">Time</label>
-            <input type="time" class="crm-form-input" id="followup-time" value="${currentTime}" required>
-          </div>
-        </div>
-        <div class="crm-form-group">
-          <label class="crm-form-label">Note (optional)</label>
-          <textarea class="crm-form-input crm-form-textarea" id="followup-note" placeholder="Reason for follow-up, context, etc."></textarea>
-        </div>
-        <div class="crm-form-actions">
-          <button type="button" class="crm-btn" id="followup-cancel-btn">Cancel</button>
-          <button type="submit" class="crm-btn crm-btn-primary">Save Follow-up</button>
-        </div>
-      </form>
     `;
   },
 
@@ -297,12 +246,11 @@ const CRMUI = {
   cacheElements() {
     this.elements = {
       container: document.getElementById('whatsapp-crm-container'),
-      topbar: document.getElementById('crm-topbar'),
-      panel: document.getElementById('crm-panel'),
-      toggleBtn: document.getElementById('crm-toggle-panel'),
-      expandBtn: document.getElementById('crm-expand-btn'),
-      addFollowupBtn: document.getElementById('crm-add-followup-btn'),
-      settingsBtn: document.getElementById('crm-settings-btn'),
+      floatingBtn: document.getElementById('crm-floating-btn'),
+      fabBadge: document.getElementById('crm-fab-badge'),
+      popupPanel: document.getElementById('crm-popup-panel'),
+      closeBtn: document.getElementById('crm-close-btn'),
+      refreshBtn: document.getElementById('crm-refresh-btn'),
       tabs: document.querySelectorAll('.crm-tab'),
       tabContents: document.querySelectorAll('.crm-tab-content'),
       leadContainer: document.getElementById('crm-lead-container'),
@@ -321,25 +269,32 @@ const CRMUI = {
    * Setup event listeners
    */
   setupEventListeners() {
-    // Toggle panel
-    this.elements.toggleBtn?.addEventListener('click', () => this.togglePanel());
-    this.elements.expandBtn?.addEventListener('click', () => this.togglePanel());
+    // Floating button click - toggle popup
+    this.elements.floatingBtn?.addEventListener('click', () => this.togglePopup());
+
+    // Close button
+    this.elements.closeBtn?.addEventListener('click', () => this.closePopup());
+
+    // Refresh button
+    this.elements.refreshBtn?.addEventListener('click', () => this.refresh());
 
     // Tab switching
     this.elements.tabs?.forEach(tab => {
       tab.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
     });
 
-    // Add follow-up button
-    this.elements.addFollowupBtn?.addEventListener('click', () => this.openFollowUpModal());
-
-    // Settings button
-    this.elements.settingsBtn?.addEventListener('click', () => {
-      this.expandPanel();
-      this.switchTab('settings');
+    // Stat items click - switch to relevant tab
+    document.getElementById('crm-stat-due')?.addEventListener('click', () => {
+      this.switchTab('followups');
+    });
+    document.getElementById('crm-stat-pending')?.addEventListener('click', () => {
+      this.switchTab('followups');
+    });
+    document.getElementById('crm-stat-leads')?.addEventListener('click', () => {
+      this.switchTab('lead');
     });
 
-    // Modal close
+    // Modal handlers
     document.getElementById('crm-modal-close')?.addEventListener('click', () => this.closeFollowUpModal());
     document.getElementById('followup-cancel-btn')?.addEventListener('click', () => this.closeFollowUpModal());
 
@@ -360,13 +315,26 @@ const CRMUI = {
 
     // Settings handlers
     this.setupSettingsListeners();
+
+    // Close popup when clicking outside
+    document.addEventListener('click', (e) => {
+      if (this.isOpen &&
+          !this.elements.popupPanel?.contains(e.target) &&
+          !this.elements.floatingBtn?.contains(e.target) &&
+          !this.elements.followupModal?.contains(e.target)) {
+        // Don't close if clicking on modal
+        if (!e.target.closest('.crm-modal-overlay')) {
+          this.closePopup();
+        }
+      }
+    });
   },
 
   /**
    * Setup settings event listeners
    */
   setupSettingsListeners() {
-    // PC Config
+    // PC Config - debounced save
     const pcNameInput = document.getElementById('setting-pc-name');
     const roleSelect = document.getElementById('setting-role');
     const waNumberInput = document.getElementById('setting-wa-number');
@@ -390,18 +358,22 @@ const CRMUI = {
     // Notifications toggle
     document.getElementById('setting-notifications')?.addEventListener('change', async (e) => {
       await CRMStorage.updateSetting('notificationsEnabled', e.target.checked);
+      CRMUtils.log('Notifications setting:', e.target.checked);
     });
 
     // Sheet ID
     document.getElementById('setting-sheet-id')?.addEventListener('input', CRMUtils.debounce(async (e) => {
       await CRMStorage.saveGoogleSheetId(e.target.value);
+      CRMUtils.log('Sheet ID saved');
     }, 500));
 
     // Connect to Sheets
     document.getElementById('sheets-connect-btn')?.addEventListener('click', () => this.connectGoogleSheets());
 
-    // Export/Import
+    // Export
     document.getElementById('export-data-btn')?.addEventListener('click', () => this.exportData());
+
+    // Import
     document.getElementById('import-data-btn')?.addEventListener('click', () => {
       document.getElementById('import-file-input')?.click();
     });
@@ -412,48 +384,85 @@ const CRMUI = {
    * Load settings into UI
    */
   async loadSettings() {
-    const pcConfig = await CRMStorage.getPCConfig();
-    const settings = await CRMStorage.getSettings();
-    const sheetId = await CRMStorage.getGoogleSheetId();
+    try {
+      const pcConfig = await CRMStorage.getPCConfig();
+      const settings = await CRMStorage.getSettings();
+      const sheetId = await CRMStorage.getGoogleSheetId();
+      const syncStatus = await CRMStorage.getSyncStatus();
 
-    document.getElementById('setting-pc-name').value = pcConfig.pcName || '';
-    document.getElementById('setting-role').value = pcConfig.role || 'staff';
-    document.getElementById('setting-wa-number').value = pcConfig.whatsappNumber || '';
-    document.getElementById('setting-notifications').checked = settings.notificationsEnabled !== false;
-    document.getElementById('setting-sheet-id').value = sheetId || '';
-  },
+      const pcNameInput = document.getElementById('setting-pc-name');
+      const roleSelect = document.getElementById('setting-role');
+      const waNumberInput = document.getElementById('setting-wa-number');
+      const notificationsInput = document.getElementById('setting-notifications');
+      const sheetIdInput = document.getElementById('setting-sheet-id');
 
-  /**
-   * Toggle panel expand/collapse
-   */
-  togglePanel() {
-    if (this.isExpanded) {
-      this.collapsePanel();
-    } else {
-      this.expandPanel();
+      if (pcNameInput) pcNameInput.value = pcConfig.pcName || '';
+      if (roleSelect) roleSelect.value = pcConfig.role || 'staff';
+      if (waNumberInput) waNumberInput.value = pcConfig.whatsappNumber || '';
+      if (notificationsInput) notificationsInput.checked = settings.notificationsEnabled !== false;
+      if (sheetIdInput) sheetIdInput.value = sheetId || '';
+
+      // Update sheets status
+      const statusDot = document.getElementById('sheets-status-dot');
+      const statusText = document.getElementById('sheets-status-text');
+
+      if (syncStatus.status === 'connected' || syncStatus.status === 'synced') {
+        statusDot?.classList.add('connected');
+        if (statusText) statusText.textContent = 'Connected';
+      } else {
+        statusDot?.classList.remove('connected');
+        if (statusText) statusText.textContent = syncStatus.error || 'Not connected';
+      }
+    } catch (error) {
+      CRMUtils.error('Failed to load settings:', error);
     }
   },
 
   /**
-   * Expand panel
+   * Toggle popup open/close
    */
-  expandPanel() {
-    this.isExpanded = true;
-    this.elements.panel?.classList.add('open');
-    this.elements.topbar?.classList.add('expanded');
-    document.body.classList.add('crm-expanded');
-    this.elements.expandBtn.textContent = '▲';
+  togglePopup() {
+    if (this.isOpen) {
+      this.closePopup();
+    } else {
+      this.openPopup();
+    }
   },
 
   /**
-   * Collapse panel
+   * Open popup
    */
-  collapsePanel() {
-    this.isExpanded = false;
-    this.elements.panel?.classList.remove('open');
-    this.elements.topbar?.classList.remove('expanded');
-    document.body.classList.remove('crm-expanded');
-    this.elements.expandBtn.textContent = '▼';
+  openPopup() {
+    this.isOpen = true;
+    this.elements.popupPanel?.classList.add('open');
+    this.elements.floatingBtn.style.display = 'none';
+
+    // Load current tab content
+    this.loadTabContent(this.currentTab);
+  },
+
+  /**
+   * Close popup
+   */
+  closePopup() {
+    this.isOpen = false;
+    this.elements.popupPanel?.classList.remove('open');
+    this.elements.floatingBtn.style.display = 'flex';
+  },
+
+  /**
+   * Refresh data
+   */
+  async refresh() {
+    await this.updateStats();
+    await this.loadTabContent(this.currentTab);
+
+    // Refresh current lead if detector has one
+    if (window.LeadDetector?.getCurrentLead()) {
+      await window.LeadDetector.refreshCurrentLead();
+    }
+
+    CRMUtils.log('Data refreshed');
   },
 
   /**
@@ -484,7 +493,7 @@ const CRMUI = {
     switch (tabName) {
       case 'lead':
         if (this.currentLead) {
-          this.renderLeadCard(this.currentLead);
+          await this.renderLeadCard(this.currentLead);
         }
         break;
       case 'followups':
@@ -504,10 +513,9 @@ const CRMUI = {
    */
   async handleChatOpened(lead) {
     this.currentLead = lead;
-    this.elements.addFollowupBtn.disabled = false;
 
-    if (this.currentTab === 'lead') {
-      this.renderLeadCard(lead);
+    if (this.currentTab === 'lead' && this.isOpen) {
+      await this.renderLeadCard(lead);
     }
 
     await this.updateStats();
@@ -518,14 +526,15 @@ const CRMUI = {
    */
   handleChatClosed() {
     this.currentLead = null;
-    this.elements.addFollowupBtn.disabled = true;
 
-    this.elements.leadContainer.innerHTML = `
-      <div class="crm-empty">
-        <div class="crm-empty-icon">💬</div>
-        <div class="crm-empty-text">Open a WhatsApp chat to see lead info</div>
-      </div>
-    `;
+    if (this.elements.leadContainer) {
+      this.elements.leadContainer.innerHTML = `
+        <div class="crm-empty">
+          <div class="crm-empty-icon">💬</div>
+          <div class="crm-empty-text">Open a WhatsApp chat to see lead info</div>
+        </div>
+      `;
+    }
   },
 
   /**
@@ -539,20 +548,30 @@ const CRMUI = {
     if (activeFollowUp) {
       const isDue = CRMUtils.isFollowUpDue(activeFollowUp.dateTime);
       followUpHtml = `
-        <div class="crm-followup-item ${isDue ? 'due' : ''}">
-          <div class="crm-followup-icon ${isDue ? 'due' : ''}">📅</div>
-          <div class="crm-followup-content">
-            <div class="crm-followup-time">${CRMUtils.formatDateTime(activeFollowUp.dateTime)}</div>
-            ${activeFollowUp.note ? `<div class="crm-followup-note">${CRMUtils.escapeHtml(activeFollowUp.note)}</div>` : ''}
-            <div class="crm-followup-meta">
-              ${CRMUtils.getRelativeTime(activeFollowUp.dateTime)} · Created by ${activeFollowUp.createdBy || 'Unknown'}
+        <div class="crm-followup-section">
+          <div class="crm-section-title">📅 Active Follow-up</div>
+          <div class="crm-followup-item ${isDue ? 'due' : ''}">
+            <div class="crm-followup-icon ${isDue ? 'due' : ''}">⏰</div>
+            <div class="crm-followup-content">
+              <div class="crm-followup-time">${CRMUtils.formatDateTime(activeFollowUp.dateTime)}</div>
+              ${activeFollowUp.note ? `<div class="crm-followup-note">${CRMUtils.escapeHtml(activeFollowUp.note)}</div>` : ''}
+              <div class="crm-followup-meta">
+                ${CRMUtils.getRelativeTime(activeFollowUp.dateTime)} · by ${activeFollowUp.createdBy || 'Unknown'}
+              </div>
+            </div>
+            <div class="crm-followup-actions">
+              <button class="crm-followup-btn crm-followup-btn-done" data-phone="${lead.phone}" data-id="${activeFollowUp.id}">
+                ✓ Done
+              </button>
             </div>
           </div>
-          <div class="crm-followup-actions">
-            <button class="crm-followup-btn crm-followup-btn-done" data-phone="${lead.phone}" data-id="${activeFollowUp.id}">
-              ✓ Done
-            </button>
-          </div>
+        </div>
+      `;
+    } else {
+      followUpHtml = `
+        <div class="crm-add-followup-card" id="add-followup-card">
+          <div class="crm-add-followup-card-icon">📅</div>
+          <div class="crm-add-followup-card-text">Click to schedule a follow-up</div>
         </div>
       `;
     }
@@ -589,42 +608,50 @@ const CRMUI = {
           </div>
           <div class="crm-detail-item">
             <div class="crm-detail-label">Follow-ups</div>
-            <div class="crm-detail-value">${(lead.followUpHistory?.length || 0)} completed</div>
+            <div class="crm-detail-value">${(lead.followUpHistory?.length || 0)} done</div>
           </div>
         </div>
       </div>
 
-      ${activeFollowUp ? `
-        <div class="crm-followup-form">
-          <div class="crm-form-title">Active Follow-up</div>
-          ${followUpHtml}
-        </div>
-      ` : `
-        <div class="crm-followup-form">
-          <div class="crm-form-title">No Active Follow-up</div>
-          <button class="crm-btn crm-btn-primary" id="add-followup-inline-btn" style="width: 100%;">
-            ➕ Schedule Follow-up
-          </button>
-        </div>
-      `}
+      ${followUpHtml}
     `;
 
     this.elements.leadContainer.innerHTML = html;
 
-    // Add event listeners
-    document.getElementById('lead-status-select')?.addEventListener('change', async (e) => {
-      await CRMStorage.updateLeadStatus(lead.phone, e.target.value);
-      lead.status = e.target.value;
-      this.renderLeadCard(lead);
-      await this.updateStats();
+    // Add event listeners for lead card
+    this.attachLeadCardListeners(lead, activeFollowUp);
+  },
+
+  /**
+   * Attach event listeners to lead card elements
+   */
+  attachLeadCardListeners(lead, activeFollowUp) {
+    // Status change
+    const statusSelect = document.getElementById('lead-status-select');
+    statusSelect?.addEventListener('change', async (e) => {
+      try {
+        await CRMStorage.updateLeadStatus(lead.phone, e.target.value);
+        lead.status = e.target.value;
+
+        // Update the select styling
+        const statusInfo = CRMUtils.getStatusInfo(e.target.value);
+        statusSelect.className = `crm-status-select ${statusInfo.class}`;
+
+        await this.updateStats();
+        CRMUtils.log('Status updated to:', e.target.value);
+      } catch (error) {
+        CRMUtils.error('Failed to update status:', error);
+        alert('Failed to update status');
+      }
     });
 
-    document.getElementById('add-followup-inline-btn')?.addEventListener('click', () => {
-      this.openFollowUpModal();
-    });
+    // Add follow-up card click
+    const addFollowUpCard = document.getElementById('add-followup-card');
+    addFollowUpCard?.addEventListener('click', () => this.openFollowUpModal());
 
     // Complete follow-up button
-    document.querySelector('.crm-followup-btn-done')?.addEventListener('click', async (e) => {
+    const doneBtn = document.querySelector('.crm-followup-btn-done');
+    doneBtn?.addEventListener('click', async (e) => {
       const phone = e.target.dataset.phone;
       const id = e.target.dataset.id;
       await this.completeFollowUp(phone, id);
@@ -635,114 +662,125 @@ const CRMUI = {
    * Load all pending follow-ups
    */
   async loadFollowUps() {
-    const dueFollowUps = await CRMStorage.getDueFollowUps();
-    const leadsWithFollowUps = await CRMStorage.getLeadsWithPendingFollowUps();
+    try {
+      const leadsWithFollowUps = await CRMStorage.getLeadsWithPendingFollowUps();
 
-    if (leadsWithFollowUps.length === 0) {
-      this.elements.followupsContainer.innerHTML = `
-        <div class="crm-empty">
-          <div class="crm-empty-icon">📋</div>
-          <div class="crm-empty-text">No pending follow-ups</div>
+      if (leadsWithFollowUps.length === 0) {
+        this.elements.followupsContainer.innerHTML = `
+          <div class="crm-empty">
+            <div class="crm-empty-icon">📋</div>
+            <div class="crm-empty-text">No pending follow-ups</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Collect all follow-ups
+      const allFollowUps = [];
+      leadsWithFollowUps.forEach(lead => {
+        lead.followUps?.forEach(f => {
+          if (!f.completed) {
+            allFollowUps.push({ ...f, lead });
+          }
+        });
+      });
+
+      // Sort by date
+      allFollowUps.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+
+      const html = `
+        <div class="crm-followup-list">
+          ${allFollowUps.map(f => {
+            const isDue = CRMUtils.isFollowUpDue(f.dateTime);
+            return `
+              <div class="crm-followup-item ${isDue ? 'due' : ''}">
+                <div class="crm-followup-icon ${isDue ? 'due' : ''}">📅</div>
+                <div class="crm-followup-content">
+                  <div class="crm-followup-time">
+                    <strong>${CRMUtils.escapeHtml(f.lead.name)}</strong>
+                  </div>
+                  <div class="crm-followup-note">${CRMUtils.formatDateTime(f.dateTime)}</div>
+                  ${f.note ? `<div class="crm-followup-note">${CRMUtils.escapeHtml(f.note)}</div>` : ''}
+                  <div class="crm-followup-meta">
+                    ${CRMUtils.getRelativeTime(f.dateTime)} · ${CRMUtils.formatPhone(f.lead.phone)}
+                  </div>
+                </div>
+                <div class="crm-followup-actions">
+                  <button class="crm-followup-btn crm-followup-btn-done" data-phone="${f.lead.phone}" data-id="${f.id}">
+                    ✓ Done
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       `;
-      return;
+
+      this.elements.followupsContainer.innerHTML = html;
+
+      // Add click handlers for done buttons
+      this.elements.followupsContainer.querySelectorAll('.crm-followup-btn-done').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          const phone = e.target.dataset.phone;
+          const id = e.target.dataset.id;
+          await this.completeFollowUp(phone, id);
+        });
+      });
+
+    } catch (error) {
+      CRMUtils.error('Failed to load follow-ups:', error);
     }
-
-    // Sort by follow-up date
-    const allFollowUps = [];
-    leadsWithFollowUps.forEach(lead => {
-      lead.followUps?.forEach(f => {
-        if (!f.completed) {
-          allFollowUps.push({ ...f, lead });
-        }
-      });
-    });
-
-    allFollowUps.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
-
-    const html = `
-      <div class="crm-followup-list">
-        ${allFollowUps.map(f => {
-          const isDue = CRMUtils.isFollowUpDue(f.dateTime);
-          return `
-            <div class="crm-followup-item ${isDue ? 'due' : ''}">
-              <div class="crm-followup-icon ${isDue ? 'due' : ''}">📅</div>
-              <div class="crm-followup-content">
-                <div class="crm-followup-time">
-                  <strong>${CRMUtils.escapeHtml(f.lead.name)}</strong> - ${CRMUtils.formatDateTime(f.dateTime)}
-                </div>
-                ${f.note ? `<div class="crm-followup-note">${CRMUtils.escapeHtml(f.note)}</div>` : ''}
-                <div class="crm-followup-meta">
-                  ${CRMUtils.getRelativeTime(f.dateTime)} · ${CRMUtils.formatPhone(f.lead.phone)}
-                </div>
-              </div>
-              <div class="crm-followup-actions">
-                <button class="crm-followup-btn crm-followup-btn-done" data-phone="${f.lead.phone}" data-id="${f.id}">
-                  ✓ Done
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-
-    this.elements.followupsContainer.innerHTML = html;
-
-    // Add click handlers
-    this.elements.followupsContainer.querySelectorAll('.crm-followup-btn-done').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const phone = e.target.dataset.phone;
-        const id = e.target.dataset.id;
-        await this.completeFollowUp(phone, id);
-      });
-    });
   },
 
   /**
    * Load history
    */
   async loadHistory() {
-    const activityLog = await CRMStorage.getActivityLog(50);
+    try {
+      const activityLog = await CRMStorage.getActivityLog(50);
 
-    if (activityLog.length === 0) {
-      this.elements.historyContainer.innerHTML = `
-        <div class="crm-empty">
-          <div class="crm-empty-icon">📜</div>
-          <div class="crm-empty-text">No activity yet</div>
+      if (activityLog.length === 0) {
+        this.elements.historyContainer.innerHTML = `
+          <div class="crm-empty">
+            <div class="crm-empty-icon">📜</div>
+            <div class="crm-empty-text">No activity yet</div>
+          </div>
+        `;
+        return;
+      }
+
+      const actionLabels = {
+        'lead_created': '👤 New lead',
+        'lead_updated': '✏️ Updated',
+        'lead_deleted': '🗑️ Deleted',
+        'status_changed': '🔄 Status',
+        'followup_added': '📅 Follow-up added',
+        'followup_completed': '✅ Completed',
+        'data_imported': '📥 Imported',
+        'data_cleared': '🗑️ Cleared'
+      };
+
+      const html = `
+        <div class="crm-activity-log">
+          ${activityLog.map(entry => `
+            <div class="crm-activity-item">
+              <div class="crm-activity-time">${CRMUtils.formatTime(entry.timestamp)}</div>
+              <div class="crm-activity-text">
+                ${actionLabels[entry.action] || entry.action}
+                ${entry.data.name ? ` - ${CRMUtils.escapeHtml(entry.data.name)}` : ''}
+                ${entry.data.oldStatus && entry.data.newStatus ? ` (${entry.data.oldStatus} → ${entry.data.newStatus})` : ''}
+              </div>
+              <div class="crm-activity-user">${entry.pcName}</div>
+            </div>
+          `).join('')}
         </div>
       `;
-      return;
+
+      this.elements.historyContainer.innerHTML = html;
+
+    } catch (error) {
+      CRMUtils.error('Failed to load history:', error);
     }
-
-    const actionLabels = {
-      'lead_created': '👤 New lead',
-      'lead_updated': '✏️ Lead updated',
-      'lead_deleted': '🗑️ Lead deleted',
-      'status_changed': '🔄 Status changed',
-      'followup_added': '📅 Follow-up scheduled',
-      'followup_completed': '✅ Follow-up completed',
-      'data_imported': '📥 Data imported',
-      'data_cleared': '🗑️ Data cleared'
-    };
-
-    const html = `
-      <div class="crm-activity-log">
-        ${activityLog.map(entry => `
-          <div class="crm-activity-item">
-            <div class="crm-activity-time">${CRMUtils.formatDateTime(entry.timestamp)}</div>
-            <div class="crm-activity-text">
-              ${actionLabels[entry.action] || entry.action}
-              ${entry.data.name ? ` - <strong>${CRMUtils.escapeHtml(entry.data.name)}</strong>` : ''}
-              ${entry.data.oldStatus && entry.data.newStatus ? ` (${entry.data.oldStatus} → ${entry.data.newStatus})` : ''}
-            </div>
-            <div class="crm-activity-user">${entry.pcName}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-
-    this.elements.historyContainer.innerHTML = html;
   },
 
   /**
@@ -754,10 +792,14 @@ const CRMUI = {
       return;
     }
 
-    // Reset form
-    document.getElementById('followup-date').value = CRMUtils.getTodayDate();
-    document.getElementById('followup-time').value = CRMUtils.getCurrentTime();
-    document.getElementById('followup-note').value = '';
+    // Reset form with today's date and current time
+    const dateInput = document.getElementById('followup-date');
+    const timeInput = document.getElementById('followup-time');
+    const noteInput = document.getElementById('followup-note');
+
+    if (dateInput) dateInput.value = CRMUtils.getTodayDate();
+    if (timeInput) timeInput.value = CRMUtils.getCurrentTime();
+    if (noteInput) noteInput.value = '';
 
     this.elements.followupModal?.classList.add('open');
   },
@@ -780,9 +822,9 @@ const CRMUI = {
       return;
     }
 
-    const date = document.getElementById('followup-date').value;
-    const time = document.getElementById('followup-time').value;
-    const note = document.getElementById('followup-note').value;
+    const date = document.getElementById('followup-date')?.value;
+    const time = document.getElementById('followup-time')?.value;
+    const note = document.getElementById('followup-note')?.value;
 
     if (!date || !time) {
       alert('Please select date and time');
@@ -794,17 +836,19 @@ const CRMUI = {
 
       await CRMStorage.addFollowUp(this.currentLead.phone, {
         dateTime: dateTime.toISOString(),
-        note: note
+        note: note || ''
       });
 
       this.closeFollowUpModal();
       await this.updateStats();
 
       // Refresh current lead display
-      if (this.currentTab === 'lead') {
-        const updatedLead = await CRMStorage.getLead(this.currentLead.phone);
+      const updatedLead = await CRMStorage.getLead(this.currentLead.phone);
+      if (updatedLead) {
         this.currentLead = updatedLead;
-        this.renderLeadCard(updatedLead);
+        if (this.currentTab === 'lead') {
+          await this.renderLeadCard(updatedLead);
+        }
       }
 
       CRMUtils.log('Follow-up added successfully');
@@ -830,9 +874,11 @@ const CRMUI = {
 
       if (this.currentLead?.phone === phone) {
         const updatedLead = await CRMStorage.getLead(phone);
-        this.currentLead = updatedLead;
-        if (this.currentTab === 'lead') {
-          this.renderLeadCard(updatedLead);
+        if (updatedLead) {
+          this.currentLead = updatedLead;
+          if (this.currentTab === 'lead') {
+            await this.renderLeadCard(updatedLead);
+          }
         }
       }
 
@@ -848,30 +894,41 @@ const CRMUI = {
    * Handle follow-up due event
    */
   handleFollowUpDue(data) {
-    // Show notification in UI
-    this.elements.badgeDue?.classList.add('crm-notification-active');
-
-    // Highlight the stat
-    setTimeout(() => {
-      this.elements.badgeDue?.classList.remove('crm-notification-active');
-    }, 5000);
+    // Update FAB badge
+    this.updateStats();
   },
 
   /**
-   * Update statistics in top bar
+   * Update statistics
    */
   async updateStats() {
-    const stats = await CRMStorage.getStatistics();
+    try {
+      const stats = await CRMStorage.getStatistics();
 
-    this.elements.badgeDue.textContent = stats.dueFollowUps;
-    this.elements.badgePending.textContent = stats.pendingFollowUps;
-    this.elements.badgeLeads.textContent = stats.totalLeads;
+      // Update panel stats
+      if (this.elements.badgeDue) {
+        this.elements.badgeDue.textContent = stats.dueFollowUps;
+        this.elements.badgeDue.classList.toggle('danger', stats.dueFollowUps > 0);
+      }
+      if (this.elements.badgePending) {
+        this.elements.badgePending.textContent = stats.pendingFollowUps;
+      }
+      if (this.elements.badgeLeads) {
+        this.elements.badgeLeads.textContent = stats.totalLeads;
+      }
 
-    // Update badge styles
-    if (stats.dueFollowUps > 0) {
-      this.elements.badgeDue.classList.add('danger');
-    } else {
-      this.elements.badgeDue.classList.remove('danger');
+      // Update FAB badge
+      if (this.elements.fabBadge) {
+        if (stats.dueFollowUps > 0) {
+          this.elements.fabBadge.textContent = stats.dueFollowUps;
+          this.elements.fabBadge.classList.remove('hidden');
+        } else {
+          this.elements.fabBadge.classList.add('hidden');
+        }
+      }
+
+    } catch (error) {
+      CRMUtils.error('Failed to update stats:', error);
     }
   },
 
@@ -890,16 +947,28 @@ const CRMUI = {
    */
   async connectGoogleSheets() {
     try {
-      // Send message to background script to initiate OAuth
+      const btn = document.getElementById('sheets-connect-btn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Connecting...';
+      }
+
       chrome.runtime.sendMessage({
         type: 'CONNECT_GOOGLE_SHEETS'
       }, (response) => {
         if (response?.success) {
-          document.getElementById('sheets-status-dot').classList.add('connected');
-          document.getElementById('sheets-status-text').textContent = 'Connected';
-          document.getElementById('sheets-connect-btn').textContent = 'Reconnect';
+          const statusDot = document.getElementById('sheets-status-dot');
+          const statusText = document.getElementById('sheets-status-text');
+          statusDot?.classList.add('connected');
+          if (statusText) statusText.textContent = 'Connected';
+          if (btn) btn.textContent = 'Connected';
+          CRMUtils.log('Connected to Google Sheets');
         } else {
-          alert('Failed to connect to Google Sheets. Please check your settings.');
+          alert('Failed to connect. Please check your settings.');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Connect';
+          }
         }
       });
     } catch (error) {
@@ -926,6 +995,7 @@ const CRMUI = {
       URL.revokeObjectURL(url);
 
       CRMUtils.log('Data exported successfully');
+      alert('Data exported successfully!');
     } catch (error) {
       CRMUtils.error('Export failed:', error);
       alert('Failed to export data');
@@ -936,7 +1006,7 @@ const CRMUI = {
    * Import CRM data
    */
   async importData(e) {
-    const file = e.target.files[0];
+    const file = e.target.files?.[0];
     if (!file) return;
 
     try {
@@ -948,6 +1018,9 @@ const CRMUI = {
         await this.updateStats();
         alert('Data imported successfully!');
         CRMUtils.log('Data imported successfully');
+
+        // Refresh current view
+        await this.loadTabContent(this.currentTab);
       }
     } catch (error) {
       CRMUtils.error('Import failed:', error);
